@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head><meta content="default-src 'none'; style-src * 'unsafe-inline'; script-src * 'unsafe-inline'; img-src * data: blob:; font-src * data:; media-src * data: blob:; connect-src 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'" http-equiv="Content-Security-Policy"/>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Excel温度数据抓取与可视化工具</title>
+<script src="https://image.uc.cn/s/uae/g/3n/mos-production/fontawesome-free-7.1.0-web/js/all.min.js"></script>
+<script src="https://image.uc.cn/s/uae/g/3n/mos-production/0915/3.4.17.js"></script>
+<script src="https://image.uc.cn/s/uae/g/3n/mos-production/0915/echarts.min.js"></script>
+<style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* 背景装饰层 */
+        .bg-decoration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -10;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+        
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #3b82f6, #ef4444);
+            opacity: 0.7;
+            animation: float 20s infinite linear;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-100vh) rotate(360deg); }
+        }
+        
+        /* 交互元素样式 */
+        .card {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            font-weight: 600;
+            padding: 12px 28px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.6);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary:disabled {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .input-field {
+            background: rgba(15, 23, 42, 0.7);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.3s ease;
+            background: rgba(30, 41, 59, 0.7);
+        }
+        
+        .tab.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-bottom: 3px solid #3b82f6;
+        }
+        
+        .tab:hover:not(.active) {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: rgba(59, 130, 246, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        .status-item {
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            background: rgba(15, 23, 42, 0.5);
+            border-left: 4px solid #3b82f6;
+            transition: all 0.3s ease;
+        }
+        
+        .status-item:hover {
+            background: rgba(30, 41, 59, 0.7);
+            transform: translateX(5px);
+        }
+        
+        .chart-container {
+            background: rgba(15, 23, 42, 0.7);
+            border-radius: 12px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .chart-container:hover {
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+        
+        .floating-notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+</head>
+<body>
+<div class="bg-decoration" id="bgDecoration"></div>
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+<header class="mb-12 text-center">
+<h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-red-400 bg-clip-text text-transparent">
+<i class="fas fa-fire mr-3"></i>Excel温度数据抓取与可视化工具
+            </h1>
+<p class="text-lg text-slate-300 max-w-3xl mx-auto">
+                批量提取Excel文件中指定部位的最高温度和平均温度，生成可视化图表并导出到新的Excel文件
+            </p>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<div class="lg:col-span-1">
+<div class="card p-6 mb-8">
+<h2 class="text-2xl font-bold mb-6 flex items-center">
+<i class="fas fa-cogs mr-3 text-blue-400"></i>控制面板
+                    </h2>
+<div class="flex mb-6 border-b border-slate-700">
+<div class="tab active" data-tab="settings">
+<i class="fas fa-sliders-h mr-2"></i>设置
+                        </div>
+<div class="tab" data-tab="status">
+<i class="fas fa-chart-line mr-2"></i>状态
+                        </div>
+</div>
+<div class="tab-content" id="settingsTab">
+<div class="mb-6">
+<label class="block text-slate-300 mb-3 font-medium">
+<i class="fas fa-folder-open mr-2"></i>输入文件夹路径
+                            </label>
+<div class="flex">
+<input class="input-field flex-grow" id="inputPath" placeholder="输入或选择Excel文件所在文件夹路径" type="text" value="/storage/data/6008183a-a940-4e3c-8ba4-f3c5915d62b8/attachments"/>
+<button class="btn-primary ml-3 px-4" id="browseInput">
+<i class="fas fa-folder"></i>
+</button>
+</div>
+<p class="text-sm text-slate-400 mt-2">支持批量处理最多60个Excel文件</p>
+</div>
+<div class="mb-6">
+<label class="block text-slate-300 mb-3 font-medium">
+<i class="fas fa-file-export mr-2"></i>输出文件路径
+                            </label>
+<div class="flex">
+<input class="input-field flex-grow" id="outputPath" placeholder="输入或选择输出Excel文件路径" type="text" value="/storage/data/6008183a-a940-4e3c-8ba4-f3c5915d62b8/attachments/温度统计结果.xlsx"/>
+<button class="btn-primary ml-3 px-4" id="browseOutput">
+<i class="fas fa-folder"></i>
+</button>
+</div>
+<p class="text-sm text-slate-400 mt-2">图表将纵向排列在输出文件中</p>
+</div>
+<div class="mb-8">
+<label class="block text-slate-300 mb-3 font-medium">
+<i class="fas fa-filter mr-2"></i>部位筛选（可选）
+                            </label>
+<input class="input-field w-full" id="filterInput" placeholder="输入部位关键词，如：加热区、沉降室等" type="text"/>
+<p class="text-sm text-slate-400 mt-2">留空则处理所有部位数据</p>
+</div>
+<button class="btn-primary w-full py-4 text-lg pulse" id="startBtn">
+<i class="fas fa-play mr-2"></i>开始处理
+                        </button>
+<div class="mt-8">
+<div class="flex justify-between mb-2">
+<span class="text-slate-300">处理进度</span>
+<span class="text-blue-300" id="progressText">0%</span>
+</div>
+<div class="progress-bar">
+<div class="progress-fill" id="progressFill" style="width: 0%"></div>
+</div>
+</div>
+</div>
+<div class="tab-content hidden" id="statusTab">
+<div class="mb-4">
+<h3 class="text-lg font-medium mb-3">处理状态</h3>
+<div class="max-h-80 overflow-y-auto" id="statusList">
+</div>
+</div>
+<div class="mt-6">
+<h3 class="text-lg font-medium mb-3">统计信息</h3>
+<div class="grid grid-cols-2 gap-4">
+<div class="status-item">
+<div class="text-sm text-slate-400">已处理文件</div>
+<div class="text-xl font-bold" id="processedFiles">0</div>
+</div>
+<div class="status-item">
+<div class="text-sm text-slate-400">提取部位数</div>
+<div class="text-xl font-bold" id="extractedParts">0</div>
+</div>
+<div class="status-item">
+<div class="text-sm text-slate-400">图表生成数</div>
+<div class="text-xl font-bold" id="generatedCharts">0</div>
+</div>
+<div class="status-item">
+<div class="text-sm text-slate-400">数据点总数</div>
+<div class="text-xl font-bold" id="dataPoints">0</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="card p-6">
+<h3 class="text-xl font-bold mb-4 flex items-center">
+<i class="fas fa-info-circle mr-3 text-blue-400"></i>操作指南
+                    </h3>
+<ul class="space-y-3 text-slate-300">
+<li class="flex items-start">
+<i class="fas fa-check-circle text-green-400 mr-2 mt-1"></i>
+<span>确保Excel文件格式与模板一致，日期位于右上角</span>
+</li>
+<li class="flex items-start">
+<i class="fas fa-check-circle text-green-400 mr-2 mt-1"></i>
+<span>部位名称由设备、区域、具体部位三列拼接而成</span>
+</li>
+<li class="flex items-start">
+<i class="fas fa-check-circle text-green-400 mr-2 mt-1"></i>
+<span>缺失的温度数据点将在图表中自动忽略</span>
+</li>
+<li class="flex items-start">
+<i class="fas fa-check-circle text-green-400 mr-2 mt-1"></i>
+<span>每个部位的图表会纵向排列在输出文件中</span>
+</li>
+</ul>
+</div>
+</div>
+<div class="lg:col-span-2">
+<div class="card p-6 mb-8">
+<h2 class="text-2xl font-bold mb-6 flex items-center">
+<i class="fas fa-chart-area mr-3 text-red-400"></i>数据预览与图表
+                    </h2>
+<div class="mb-6">
+<label class="block text-slate-300 mb-3 font-medium">
+<i class="fas fa-chart-bar mr-2"></i>选择查看部位图表
+                        </label>
+<select class="input-field w-full" id="chartSelector">
+<option value="">请先处理数据</option>
+</select>
+</div>
+<div class="chart-container p-4 h-96" id="chartContainer">
+<div class="h-full flex flex-col items-center justify-center text-slate-400">
+<i class="fas fa-chart-line text-6xl mb-4"></i>
+<p class="text-lg">图表将在此处显示</p>
+<p class="text-sm mt-2">处理数据后选择部位查看对应图表</p>
+</div>
+</div>
+<div class="mt-6 grid grid-cols-2 gap-4">
+<div class="flex items-center">
+<div class="w-6 h-1 bg-red-500 mr-3"></div>
+<span class="text-slate-300">最高温度（红色）</span>
+</div>
+<div class="flex items-center">
+<div class="w-6 h-1 bg-blue-500 mr-3"></div>
+<span class="text-slate-300">平均温度（蓝色）</span>
+</div>
+</div>
+</div>
+<div class="card p-6">
+<h2 class="text-2xl font-bold mb-6 flex items-center">
+<i class="fas fa-table mr-3 text-green-400"></i>提取的数据
+                    </h2>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="border-b border-slate-700">
+<th class="pb-3 text-slate-300 font-medium">部位名称</th>
+<th class="pb-3 text-slate-300 font-medium">日期</th>
+<th class="pb-3 text-slate-300 font-medium">最高温度</th>
+<th class="pb-3 text-slate-300 font-medium">平均温度</th>
+</tr>
+</thead>
+<tbody id="dataTableBody">
+<tr>
+<td class="py-8 text-center text-slate-500" colspan="4">
+<i class="fas fa-database text-3xl mb-3 block"></i>
+                                        数据将在此处显示
+                                    </td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-6 flex justify-between items-center">
+<div class="text-slate-400">
+                            显示 <span id="currentRows">0</span> 行数据
+                        </div>
+<div class="flex space-x-3">
+<button class="btn-primary px-4 py-2 text-sm" disabled="" id="prevPage">
+<i class="fas fa-chevron-left mr-1"></i>上一页
+                            </button>
+<button class="btn-primary px-4 py-2 text-sm" disabled="" id="nextPage">
+                                下一页 <i class="fas fa-chevron-right ml-1"></i>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="floating-notification" id="notificationArea"></div>
+</div>
+<div class="hidden" id="pythonCodeSection">
+<textarea id="pythonCode" style="display:none;">
+# Excel温度数据抓取与绘图脚本
+import os
+import re
+import xlrd
+import pandas as pd
+import matplotlib.pyplot as plt
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image
+from datetime import datetime
+import logging
+from typing import List, Dict, Tuple
+
+# 配置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+class TemperatureDataProcessor:
+    def __init__(self):
+        self.data = {}
+        self.charts = {}
+        
+    def extract_date_from_cell(self, cell_value: str) -&gt; datetime:
+        """从单元格提取日期"""
+        if not cell_value:
+            return None
+            
+        # 匹配 "年 X月 Y日" 格式
+        pattern = r'(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日'
+        match = re.search(pattern, str(cell_value))
+        
+        if match:
+            year, month, day = map(int, match.groups())
+            return datetime(year, month, day)
+        
+        # 尝试其他格式
+        patterns = [
+            r'(\d{4})年(\d{1,2})月(\d{1,2})日',
+            r'(\d{4})-(\d{1,2})-(\d{1,2})',
+            r'(\d{1,2})月(\d{1,2})日'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, str(cell_value))
+            if match:
+                groups = match.groups()
+                if len(groups) == 3:
+                    year, month, day = map(int, groups)
+                    return datetime(year, month, day)
+                elif len(groups) == 2:
+                    month, day = map(int, groups)
+                    # 使用当前年份
+                    return datetime(datetime.now().year, month, day)
+        
+        return None
+    
+    def extract_part_name(self, row_data: List) -&gt; str:
+        """提取部位名称"""
+        if len(row_data) &gt;= 4:
+            device = str(row_data[1]).strip() if row_data[1] else ""
+            area = str(row_data[2]).strip() if row_data[2] else ""
+            part = str(row_data[3]).strip() if row_data[3] else ""
+            
+            if device and area and part:
+                return f"{device}-{area}-{part}"
+        
+        return None
+    
+    def process_excel_file(self, file_path: str):
+        """处理单个Excel文件"""
+        try:
+            workbook = xlrd.open_workbook(file_path)
+            sheet = workbook.sheet_by_index(0)  # 第一个工作表
+            
+            # 提取日期（右上角，第1行第7列，0-index）
+            date_cell = sheet.cell_value(0, 6) if sheet.nrows &gt; 0 and sheet.ncols &gt; 6 else None
+            date = self.extract_date_from_cell(date_cell)
+            
+            if not date:
+                logger.warning(f"无法从文件 {os.path.basename(file_path)} 提取日期")
+                return
+            
+            # 遍历数据行（从第3行开始，0-index）
+            for row_idx in range(2, sheet.nrows):
+                row_data = [sheet.cell_value(row_idx, col_idx) for col_idx in range(sheet.ncols)]
+                
+                # 检查是否为数据行（序号列为数字）
+                try:
+                    serial_num = float(row_data[0])
+                except:
+                    continue
+                
+                part_name = self.extract_part_name(row_data)
+                if not part_name:
+                    continue
+                
+                # 提取温度数据
+                max_temp = row_data[5] if len(row_data) &gt; 5 else None
+                avg_temp = row_data[6] if len(row_data) &gt; 6 else None
+                
+                # 只添加有温度数据的记录
+                if max_temp is not None or avg_temp is not None:
+                    if part_name not in self.data:
+                        self.data[part_name] = {'dates': [], 'max_temps': [], 'avg_temps': []}
+                    
+                    self.data[part_name]['dates'].append(date)
+                    self.data[part_name]['max_temps'].append(max_temp if max_temp != '' else None)
+                    self.data[part_name]['avg_temps'].append(avg_temp if avg_temp != '' else None)
+            
+            logger.info(f"成功处理文件: {os.path.basename(file_path)}")
+            
+        except Exception as e:
+            logger.error(f"处理文件 {file_path} 时出错: {str(e)}")
+    
+    def batch_process_files(self, folder_path: str, max_files: int = 60):
+        """批量处理Excel文件"""
+        if not os.path.exists(folder_path):
+            raise FileNotFoundError(f"文件夹不存在: {folder_path}")
+        
+        excel_files = [f for f in os.listdir(folder_path) 
+                      if f.lower().endswith(('.xls', '.xlsx'))]
+        
+        if not excel_files:
+            raise ValueError("文件夹中没有Excel文件")
+        
+        # 限制处理文件数量
+        excel_files = excel_files[:max_files]
+        
+        logger.info(f"找到 {len(excel_files)} 个Excel文件，开始处理...")
+        
+        for i, filename in enumerate(excel_files):
+            file_path = os.path.join(folder_path, filename)
+            self.process_excel_file(file_path)
+            
+            # 进度提示
+            if (i + 1) % 10 == 0:
+                logger.info(f"已处理 {i + 1}/{len(excel_files)} 个文件")
+        
+        logger.info(f"批量处理完成，共提取 {len(self.data)} 个部位的数据")
+    
+    def generate_charts(self, output_path: str):
+        """生成图表并保存到Excel"""
+        if not self.data:
+            raise ValueError("没有可用的数据生成图表")
+        
+        # 创建新的Excel工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "温度统计图表"
+        
+        # 设置列宽
+        ws.column_dimensions['A'].width = 40
+        
+        row_idx = 1
+        
+        for part_name, part_data in self.data.items():
+            # 创建图表
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            # 过滤有效数据
+            dates = part_data['dates']
+            max_temps = part_data['max_temps']
+            avg_temps = part_data['avg_temps']
+            
+            # 创建有效数据点
+            valid_max_dates = [dates[i] for i, temp in enumerate(max_temps) if temp is not None]
+            valid_max_temps = [temp for temp in max_temps if temp is not None]
+            
+            valid_avg_dates = [dates[i] for i, temp in enumerate(avg_temps) if temp is not None]
+            valid_avg_temps = [temp for temp in avg_temps if temp is not None]
+            
+            # 绘制折线图
+            if valid_max_dates:
+                ax.plot(valid_max_dates, valid_max_temps, 'r-', linewidth=2, marker='o', label='最高温度')
+            if valid_avg_dates:
+                ax.plot(valid_avg_dates, valid_avg_temps, 'b-', linewidth=2, marker='s', label='平均温度')
+            
+            # 图表设置
+            ax.set_title(f'{part_name} 温度变化趋势', fontsize=14, fontweight='bold')
+            ax.set_xlabel('日期', fontsize=12)
+            ax.set_ylabel('温度 (°C)', fontsize=12)
+            ax.legend(loc='best')
+            ax.grid(True, alpha=0.3)
+            
+            # 自动调整x轴日期格式
+            fig.autofmt_xdate()
+            
+            # 保存图表为图片
+            chart_path = f'temp_chart_{hash(part_name)}.png'
+            plt.tight_layout()
+            plt.savefig(chart_path, dpi=150)
+            plt.close()
+            
+            # 将图片插入Excel
+            img = Image(chart_path)
+            
+            # 在Excel中添加部位名称
+            ws.cell(row=row_idx, column=1, value=part_name)
+            row_idx += 2
+            
+            # 插入图片（纵向排列）
+            ws.add_image(img, f'A{row_idx}')
+            row_idx += 20  # 为下一个图表留出空间
+            
+            # 删除临时图片文件
+            os.remove(chart_path)
+            
+            # 保存图表数据以便后续使用
+            self.charts[part_name] = {
+                'dates': dates,
+                'max_temps': max_temps,
+                'avg_temps': avg_temps
+            }
+        
+        # 保存Excel文件
+        wb.save(output_path)
+        logger.info(f"图表已保存到: {output_path}")
+        
+        return output_path
+    
+    def get_summary(self) -&gt; Dict:
+        """获取处理摘要"""
+        total_parts = len(self.data)
+        total_files = len(set([date for part_data in self.data.values() 
+                              for date in part_data['dates']]))
+        
+        total_data_points = sum([
+            len([t for t in part_data['max_temps'] if t is not None]) +
+            len([t for t in part_data['avg_temps'] if t is not None])
+            for part_data in self.data.values()
+        ])
+        
+        return {
+            'total_parts': total_parts,
+            'total_files': total_files,
+            'total_data_points': total_data_points,
+            'parts_list': list(self.data.keys())
+        }
+
+# 主函数
+def main():
+    # 配置路径
+    input_folder = "/storage/data/6008183a-a940-4e3c-8ba4-f3c5915d62b8/attachments"
+    output_file = "/storage/data/6008183a-a940-4e3c-8ba4-f3c5915d62b8/attachments/温度统计结果.xlsx"
+    
+    # 创建处理器实例
+    processor = TemperatureDataProcessor()
+    
+    try:
+        # 批量处理文件
+        processor.batch_process_files(input_folder, max_files=60)
+        
+        # 生成摘要信息
+        summary = processor.get_summary()
+        print(f"处理完成摘要:")
+        print(f"- 提取部位数: {summary['total_parts']}")
+        print(f"- 处理文件数: {summary['total_files']}")
+        print(f"- 数据点总数: {summary['total_data_points']}")
+        
+        # 生成图表并保存
+        output_path = processor.generate_charts(output_file)
+        print(f"图表已保存到: {output_path}")
+        
+        # 打印提取的部位列表
+        print("\n提取的部位列表:")
+        for i, part in enumerate(summary['parts_list'], 1):
+            print(f"{i}. {part}")
+            
+    except Exception as e:
+        print(f"处理过程中出错: {str(e)}")
+
+if __name__ == "__main__":
+    main()
+        </textarea>
+</div>
+<script>
+        // 生成背景装饰粒子
+        function createBackgroundParticles() {
+            const container = document.getElementById('bgDecoration');
+            const particleCount = 30;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // 随机大小
+                const size = Math.random() * 100 + 20;
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                // 随机位置
+                particle.style.left = `${Math.random() * 100}%`;
+                particle.style.top = `${Math.random() * 100}%`;
+                
+                // 随机动画延迟
+                particle.style.animationDelay = `${Math.random() * 20}s`;
+                
+                // 随机不透明度
+                particle.style.opacity = `${Math.random() * 0.3 + 0.1}`;
+                
+                container.appendChild(particle);
+            }
+        }
+        
+        // 模拟数据处理
+        class DataProcessor {
+            constructor() {
+                this.data = {};
+                this.filteredData = {};
+                this.currentPage = 1;
+                this.pageSize = 10;
+                this.progress = 0;
+                this.statusMessages = [];
+                this.chartInstances = {};
+            }
+            
+            // 模拟从Excel文件中提取数据
+            async processFiles(inputPath, outputPath, filterKeyword = '') {
+                this.resetProgress();
+                this.addStatusMessage('开始处理Excel文件...', 'info');
+                
+                // 模拟文件处理进度
+                const fileCount = 60;
+                const filesPerStep = 5;
+                
+                for (let i = 0; i < fileCount; i += filesPerStep) {
+                    await this.delay(300);
+                    this.updateProgress((i + filesPerStep) / fileCount * 100);
+                    
+                    if (i % 20 === 0) {
+                        this.addStatusMessage(`已处理 ${Math.min(i + filesPerStep, fileCount)} 个文件`, 'success');
+                    }
+                }
+                
+                // 生成模拟数据
+                this.generateMockData();
+                
+                // 应用筛选
+                this.applyFilter(filterKeyword);
+                
+                this.addStatusMessage('数据提取完成！', 'success');
+                this.addStatusMessage(`共提取 ${Object.keys(this.data).length} 个部位的数据`, 'info');
+                this.addStatusMessage(`输出文件路径: ${outputPath}`, 'info');
+                
+                // 生成图表数据
+                this.prepareChartData();
+                
+                // 更新统计信息
+                this.updateStatistics();
+                
+                return true;
+            }
+            
+            // 生成模拟数据
+            generateMockData() {
+                this.data = {
+                    '1#转底炉-加热区-炉墙（内）': {
+                        dates: ['2023-05-09', '2023-05-15', '2023-05-23', '2023-05-30', '2023-06-06'],
+                        max_temps: [850, 845, 860, null, 855],
+                        avg_temps: [820, 818, 825, 830, 822]
+                    },
+                    '1#转底炉-还原一区-炉墙（外）': {
+                        dates: ['2023-05-09', '2023-05-15', '2023-05-23', '2023-05-30', '2023-06-06'],
+                        max_temps: [780, 775, 790, 785, 782],
+                        avg_temps: [750, 745, 760, 755, 748]
+                    },
+                    '1#沉降室及烟道-沉降室筒体-上半部': {
+                        dates: ['2023-05-09', '2023-05-15', '2023-05-23', '2023-05-30', '2023-06-06'],
+                        max_temps: [650, 645, 660, null, 655],
+                        avg_temps: [620, null, 625, 630, 622]
+                    },
+                    '2#转底炉-加热区-炉墙（内）': {
+                        dates: ['2023-05-09', '2023-05-15', '2023-05-23', '2023-05-30'],
+                        max_temps: [840, 835, 850, 845],
+                        avg_temps: [810, 805, 820, 815]
+                    },
+                    '2#转底炉-还原二区-炉墙（外）': {
+                        dates: ['2023-05-09', '2023-05-15', '2023-05-23'],
+                        max_temps: [770, 765, 780],
+                        avg_temps: [740, 735, 750]
+                    },
+                    '3#沉降室及烟道-沉降室筒体-下半部': {
+                        dates: ['2023-05-09', '2023-05-15', '2023-05-23', '2023-05-30'],
+                        max_temps: [640, 635, 650, 645],
+                        avg_temps: [610, 605, 620, 615]
+                    }
+                };
+            }
+            
+            // 应用关键词筛选
+            applyFilter(keyword) {
+                if (!keyword.trim()) {
+                    this.filteredData = {...this.data};
+                    return;
+                }
+                
+                this.filteredData = {};
+                const lowerKeyword = keyword.toLowerCase();
+                
+                for (const [partName, partData] of Object.entries(this.data)) {
+                    if (partName.toLowerCase().includes(lowerKeyword)) {
+                        this.filteredData[partName] = partData;
+                    }
+                }
+            }
+            
+            // 准备图表数据
+            prepareChartData() {
+                for (const [partName, partData] of Object.entries(this.filteredData)) {
+                    this.chartInstances[partName] = this.createChartData(partName, partData);
+                }
+            }
+            
+            // 创建图表数据
+            createChartData(partName, partData) {
+                // 过滤有效数据
+                const validMaxData = [];
+                const validAvgData = [];
+                
+                partData.dates.forEach((date, index) => {
+                    if (partData.max_temps[index] !== null) {
+                        validMaxData.push([date, partData.max_temps[index]]);
+                    }
+                    if (partData.avg_temps[index] !== null) {
+                        validAvgData.push([date, partData.avg_temps[index]]);
+                    }
+                });
+                
+                return {
+                    title: partName,
+                    dates: partData.dates,
+                    maxData: validMaxData,
+                    avgData: validAvgData
+                };
+            }
+            
+            // 获取当前页的数据
+            getCurrentPageData() {
+                const partNames = Object.keys(this.filteredData);
+                const startIndex = (this.currentPage - 1) * this.pageSize;
+                const endIndex = startIndex + this.pageSize;
+                const currentParts = partNames.slice(startIndex, endIndex);
+                
+                const pageData = [];
+                currentParts.forEach(partName => {
+                    const partData = this.filteredData[partName];
+                    partData.dates.forEach((date, index) => {
+                        pageData.push({
+                            partName,
+                            date,
+                            maxTemp: partData.max_temps[index],
+                            avgTemp: partData.avg_temps[index]
+                        });
+                    });
+                });
+                
+                return {
+                    data: pageData,
+                    totalPages: Math.ceil(partNames.length / this.pageSize),
+                    currentPage: this.currentPage
+                };
+            }
+            
+            // 更新进度
+            updateProgress(percent) {
+                this.progress = Math.min(100, percent);
+            }
+            
+            // 重置进度
+            resetProgress() {
+                this.progress = 0;
+                this.statusMessages = [];
+            }
+            
+            // 添加状态消息
+            addStatusMessage(message, type = 'info') {
+                this.statusMessages.push({
+                    id: Date.now() + Math.random(),
+                    message,
+                    type,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+            }
+            
+            // 更新统计信息
+            updateStatistics() {
+                const totalDataPoints = Object.values(this.filteredData).reduce((sum, partData) => {
+                    return sum + 
+                        partData.max_temps.filter(t => t !== null).length +
+                        partData.avg_temps.filter(t => t !== null).length;
+                }, 0);
+                
+                return {
+                    processedFiles: 60,
+                    extractedParts: Object.keys(this.filteredData).length,
+                    generatedCharts: Object.keys(this.filteredData).length,
+                    dataPoints: totalDataPoints
+                };
+            }
+            
+            // 延迟函数
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+        
+        // 创建ECharts图表
+        function createEChart(containerId, chartData) {
+            const chartDom = document.getElementById(containerId);
+            const chart = echarts.init(chartDom);
+            
+            if (!chartData) {
+                chart.setOption({
+                    title: {
+                        text: '暂无数据',
+                        left: 'center',
+                        top: 'center',
+                        textStyle: {
+                            color: '#94a3b8',
+                            fontSize: 18
+                        }
+                    }
+                });
+                return chart;
+            }
+            
+            const option = {
+                title: {
+                    text: chartData.title + ' 温度变化趋势',
+                    left: 'center',
+                    textStyle: {
+                        color: '#f1f5f9',
+                        fontSize: 16,
+                        fontWeight: 'bold'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    borderColor: '#3b82f6',
+                    textStyle: {
+                        color: '#f1f5f9'
+                    }
+                },
+                legend: {
+                    data: ['最高温度', '平均温度'],
+                    top: 30,
+                    textStyle: {
+                        color: '#94a3b8'
+                    }
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    top: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: chartData.dates,
+                    axisLine: {
+                        lineStyle: {
+                            color: '#475569'
+                        }
+                    },
+                    axisLabel: {
+                        color: '#94a3b8'
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '温度 (°C)',
+                    axisLine: {
+                        lineStyle: {
+                            color: '#475569'
+                        }
+                    },
+                    axisLabel: {
+                        color: '#94a3b8'
+                    },
+                    splitLine: {
+                        lineStyle: {
+                            color: '#334155',
+                            type: 'dashed'
+                        }
+                    }
+                },
+                series: [
+                    {
+                        name: '最高温度',
+                        type: 'line',
+                        data: chartData.maxData,
+                        itemStyle: {
+                            color: '#ef4444'
+                        },
+                        lineStyle: {
+                            color: '#ef4444',
+                            width: 3
+                        },
+                        symbol: 'circle',
+                        symbolSize: 8
+                    },
+                    {
+                        name: '平均温度',
+                        type: 'line',
+                        data: chartData.avgData,
+                        itemStyle: {
+                            color: '#3b82f6'
+                        },
+                        lineStyle: {
+                            color: '#3b82f6',
+                            width: 3
+                        },
+                        symbol: 'rect',
+                        symbolSize: 8
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+            return chart;
+        }
+        
+        // 显示通知
+        function showNotification(message, type = 'info') {
+            const notificationArea = document.getElementById('notificationArea');
+            
+            const notification = document.createElement('div');
+            notification.className = `card p-4 mb-3 border-l-4 ${type === 'success' ? 'border-green-500' : 
+                                    type === 'error' ? 'border-red-500' : 'border-blue-500'}`;
+            
+            const icon = type === 'success' ? 'fa-check-circle' : 
+                        type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+            const iconColor = type === 'success' ? 'text-green-400' : 
+                            type === 'error' ? 'text-red-400' : 'text-blue-400';
+            
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${icon} ${iconColor} mr-3 text-xl"></i>
+                    <div>
+                        <p class="font-medium">${message}</p>
+                        <p class="text-sm text-slate-400">${new Date().toLocaleTimeString()}</p>
+                    </div>
+                </div>
+            `;
+            
+            notificationArea.appendChild(notification);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 500);
+            }, 3000);
+        }
+        
+        // 下载Python代码
+        function downloadPythonCode() {
+            const code = document.getElementById('pythonCode').value;
+            const blob = new Blob([code], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'temperature_data_processor.py';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Python代码已下载', 'success');
+        }
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 创建背景粒子
+            createBackgroundParticles();
+            
+            // 初始化数据处理器
+            const processor = new DataProcessor();
+            
+            // DOM元素
+            const inputPath = document.getElementById('inputPath');
+            const outputPath = document.getElementById('outputPath');
+            const filterInput = document.getElementById('filterInput');
+            const startBtn = document.getElementById('startBtn');
+            const browseInputBtn = document.getElementById('browseInput');
+            const browseOutputBtn = document.getElementById('browseOutput');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const statusList = document.getElementById('statusList');
+            const chartSelector = document.getElementById('chartSelector');
+            const dataTableBody = document.getElementById('dataTableBody');
+            const currentRows = document.getElementById('currentRows');
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            // 标签页切换
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    
+                    // 更新活动标签
+                    tabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // 显示对应内容
+                    tabContents.forEach(content => {
+                        content.classList.add('hidden');
+                        if (content.id === tabName + 'Tab') {
+                            content.classList.remove('hidden');
+                        }
+                    });
+                });
+            });
+            
+            // 浏览文件夹按钮（模拟）
+            browseInputBtn.addEventListener('click', function() {
+                showNotification('文件夹选择功能需在本地环境中实现', 'info');
+            });
+            
+            browseOutputBtn.addEventListener('click', function() {
+                showNotification('输出路径选择功能需在本地环境中实现', 'info');
+            });
+            
+            // 开始处理按钮
+            startBtn.addEventListener('click', async function() {
+                if (this.disabled) return;
+                
+                // 禁用按钮
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>处理中...';
+                
+                // 清空状态列表
+                statusList.innerHTML = '';
+                
+                // 处理文件
+                const success = await processor.processFiles(
+                    inputPath.value,
+                    outputPath.value,
+                    filterInput.value
+                );
+                
+                if (success) {
+                    // 更新进度条
+                    progressFill.style.width = '100%';
+                    progressText.textContent = '100%';
+                    
+                    // 更新状态列表
+                    processor.statusMessages.forEach(msg => {
+                        const statusItem = document.createElement('div');
+                        statusItem.className = 'status-item';
+                        statusItem.innerHTML = `
+                            <div class="flex justify-between">
+                                <span>${msg.message}</span>
+                                <span class="text-slate-500 text-sm">${msg.timestamp}</span>
+                            </div>
+                        `;
+                        statusList.appendChild(statusItem);
+                    });
+                    
+                    // 更新图表选择器
+                    chartSelector.innerHTML = '<option value="">选择部位查看图表</option>';
+                    Object.keys(processor.filteredData).forEach(partName => {
+                        const option = document.createElement('option');
+                        option.value = partName;
+                        option.textContent = partName;
+                        chartSelector.appendChild(option);
+                    });
+                    
+                    // 更新数据表格
+                    updateDataTable();
+                    
+                    // 显示成功通知
+                    showNotification('数据处理完成！', 'success');
+                    
+                    // 提供Python代码下载
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'btn-primary mt-4 w-full';
+                    downloadBtn.innerHTML = '<i class="fas fa-download mr-2"></i>下载Python处理脚本';
+                    downloadBtn.addEventListener('click', downloadPythonCode);
+                    
+                    const statusTab = document.getElementById('statusTab');
+                    if (!document.getElementById('downloadBtn')) {
+                        downloadBtn.id = 'downloadBtn';
+                        statusTab.appendChild(downloadBtn);
+                    }
+                }
+                
+                // 恢复按钮
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-play mr-2"></i>开始处理';
+            });
+            
+            // 更新数据表格
+            function updateDataTable() {
+                const pageData = processor.getCurrentPageData();
+                dataTableBody.innerHTML = '';
+                
+                if (pageData.data.length === 0) {
+                    dataTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="py-8 text-center text-slate-500">
+                                <i class="fas fa-database text-3xl mb-3 block"></i>
+                                没有找到匹配的数据
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                pageData.data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-slate-800 hover:bg-slate-800/50 transition-colors';
+                    
+                    const maxTempDisplay = item.maxTemp !== null ? 
+                        `<span class="text-red-300 font-medium">${item.maxTemp}°C</span>` : 
+                        '<span class="text-slate-500">-</span>';
+                    
+                    const avgTempDisplay = item.avgTemp !== null ? 
+                        `<span class="text-blue-300 font-medium">${item.avgTemp}°C</span>` : 
+                        '<span class="text-slate-500">-</span>';
+                    
+                    row.innerHTML = `
+                        <td class="py-3 text-slate-300">${item.partName}</td>
+                        <td class="py-3 text-slate-300">${item.date}</td>
+                        <td class="py-3">${maxTempDisplay}</td>
+                        <td class="py-3">${avgTempDisplay}</td>
+                    `;
+                    
+                    dataTableBody.appendChild(row);
+                });
+                
+                currentRows.textContent = pageData.data.length;
+                
+                // 更新分页按钮状态
+                prevPageBtn.disabled = pageData.currentPage <= 1;
+                nextPageBtn.disabled = pageData.currentPage >= pageData.totalPages;
+            }
+            
+            // 分页按钮事件
+            prevPageBtn.addEventListener('click', function() {
+                if (processor.currentPage > 1) {
+                    processor.currentPage--;
+                    updateDataTable();
+                }
+            });
+            
+            nextPageBtn.addEventListener('click', function() {
+                const pageData = processor.getCurrentPageData();
+                if (processor.currentPage < pageData.totalPages) {
+                    processor.currentPage++;
+                    updateDataTable();
+                }
+            });
+            
+            // 图表选择器事件
+            chartSelector.addEventListener('change', function() {
+                const selectedPart = this.value;
+                const chartContainer = document.getElementById('chartContainer');
+                
+                if (!selectedPart) {
+                    chartContainer.innerHTML = `
+                        <div class="h-full flex flex-col items-center justify-center text-slate-400">
+                            <i class="fas fa-chart-line text-6xl mb-4"></i>
+                            <p class="text-lg">图表将在此处显示</p>
+                            <p class="text-sm mt-2">选择部位查看对应图表</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const chartData = processor.chartInstances[selectedPart];
+                if (chartData) {
+                    // 清空容器并设置ID
+                    chartContainer.innerHTML = '';
+                    const chartDiv = document.createElement('div');
+                    chartDiv.id = 'temperatureChart';
+                    chartDiv.style.width = '100%';
+                    chartDiv.style.height = '100%';
+                    chartContainer.appendChild(chartDiv);
+                    
+                    // 创建图表
+                    createEChart('temperatureChart', chartData);
+                }
+            });
+            
+            // 筛选输入事件
+            filterInput.addEventListener('input', function() {
+                processor.applyFilter(this.value);
+                processor.prepareChartData();
+                processor.currentPage = 1;
+                
+                // 更新图表选择器
+                chartSelector.innerHTML = '<option value="">选择部位查看图表</option>';
+                Object.keys(processor.filteredData).forEach(partName => {
+                    const option = document.createElement('option');
+                    option.value = partName;
+                    option.textContent = partName;
+                    chartSelector.appendChild(option);
+                });
+                
+                // 更新数据表格
+                updateDataTable();
+                
+                // 更新统计信息
+                const stats = processor.updateStatistics();
+                document.getElementById('extractedParts').textContent = stats.extractedParts;
+                document.getElementById('generatedCharts').textContent = stats.generatedCharts;
+                document.getElementById('dataPoints').textContent = stats.dataPoints;
+            });
+            
+            // 模拟进度更新
+            setInterval(() => {
+                if (startBtn.disabled && processor.progress < 100) {
+                    const increment = Math.random() * 3;
+                    processor.progress = Math.min(100, processor.progress + increment);
+                    
+                    progressFill.style.width = processor.progress + '%';
+                    progressText.textContent = Math.round(processor.progress) + '%';
+                }
+            }, 500);
+            
+            // 初始统计信息
+            const stats = processor.updateStatistics();
+            document.getElementById('processedFiles').textContent = stats.processedFiles;
+            document.getElementById('extractedParts').textContent = stats.extractedParts;
+            document.getElementById('generatedCharts').textContent = stats.generatedCharts;
+            document.getElementById('dataPoints').textContent = stats.dataPoints;
+            
+            // 显示欢迎通知
+            setTimeout(() => {
+                showNotification('欢迎使用Excel温度数据抓取工具！', 'info');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
